@@ -192,40 +192,58 @@ function Pinocchio(_ruleset) constructor
             __time += _increment;
             var _t = GetProgress();
             
-            //Do some interpolation :D
-            var _variableNames = variable_struct_get_names(__nextState);
-            var _i = 0;
-            repeat(array_length(_variableNames))
+            if (_t < 1)
             {
-                var _variableName = _variableNames[_i];
-                
-                var _curve = !is_struct(__nextCurves)? undefined : __nextCurves[$ _variableName];
-                switch(_curve)
+                //Do some interpolation :D
+                var _variableNames = variable_struct_get_names(__nextState);
+                var _i = 0;
+                repeat(array_length(_variableNames))
                 {
-                    case undefined:             var _q = _t;        break; //Default to linear
-                    case PINOCCHIO_CURVE_NONE:    var _q = (_t >= 1); break;
-                    case PINOCCHIO_CURVE_INSTANT: var _q = (_t >  0); break;
+                    var _variableName = _variableNames[_i];
                     
-                    default:
-                        if (is_array(_curve))
-                        {
-                            var _q = __GetBezier(_curve, _t);
-                        }
-                        else
-                        {
-                            var _q = animcurve_channel_evaluate(animcurve_get_channel(_curve, 0), _t);
-                        }
-                    break;
+                    var _curve = !is_struct(__nextCurves)? undefined : __nextCurves[$ _variableName];
+                    switch(_curve)
+                    {
+                        case undefined:               var _q = _t;       break; //Default to linear
+                        case PINOCCHIO_CURVE_NONE:    var _q = 0;        break;
+                        case PINOCCHIO_CURVE_INSTANT: var _q = (_t > 0); break;
+                        
+                        default:
+                            if (is_array(_curve))
+                            {
+                                var _q = __GetBezier(_curve, _t);
+                            }
+                            else if (is_method(_curve))
+                            {
+                                var _q = _curve(_t);
+                            }
+                            else if (is_numeric(_curve))
+                            {
+                                var _q = animcurve_channel_evaluate(animcurve_get_channel(_curve, 0), _t);
+                            }
+                            else
+                            {
+                                show_error("Pinocchio:\nCurve type \"" + string(_curve) + "\" not recognised\n ", true);
+                            }
+                        break;
+                    }
+                    
+                    self[$ _variableName] = lerp(__currentValues[$ _variableName], __nextState[$ _variableName], _q);
+                    
+                    ++_i;
+                }
+            }
+            else //We've finished the animation!
+            {
+                var _variableNames = variable_struct_get_names(__nextState);
+                var _i = 0;
+                repeat(array_length(_variableNames))
+                {
+                    var _variableName = _variableNames[_i];
+                    self[$ _variableName] = __nextState[$ _variableName];
+                    ++_i;
                 }
                 
-                self[$ _variableName] = lerp(__currentValues[$ _variableName], __nextState[$ _variableName], _q);
-                
-                ++_i;
-            }
-            
-            //We've finished the animation!
-            if (_t >= 1)
-            {
                 _result = true;
                 
                 __currentStateName = __nextStateName;
