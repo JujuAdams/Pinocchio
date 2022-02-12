@@ -592,7 +592,7 @@ function Pinocchio(_ruleset) constructor
 
 
 
-#macro __PINOCCHIO_VERSION  "0.0.0"
-#macro __PINOCCHIO_DATE     "2022-02-11"
+#macro __PINOCCHIO_VERSION  "0.1.0"
+#macro __PINOCCHIO_DATE     "2022-02-12"
 
 show_debug_message("Pinocchio: Welcome to Pinocchio by @jujuadams! This is version " + __PINOCCHIO_VERSION + ", " + __PINOCCHIO_DATE);
