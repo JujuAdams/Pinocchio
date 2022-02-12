@@ -1,4 +1,4 @@
-<h1 align="center">Pinocchio 0.1.0</h1>
+<h1 align="center">Pinocchio 0.1.1</h1>
 
 <p align="center">State-based animation system for GameMaker Studio 2.3 by <b>@jujuadams</b></p>
 
