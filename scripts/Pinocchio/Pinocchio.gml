@@ -335,10 +335,9 @@ function Pinocchio(_ruleset) constructor
                     }
                     
                     Goto(__queuedStateName, __queuedDelayOffset, __queuedCallback);
+                    CancelQueued();
                     
                     if (_wasLocked) __finalizingLock = true;
-                    
-                    CancelQueued();
                 }
                 else if (__finalizeReset && (__currentStateName == PINOCCHIO_FINAL_STATE_NAME) && variable_struct_exists(__ruleset, PINOCCHIO_INITIAL_STATE_NAME))
                 {
