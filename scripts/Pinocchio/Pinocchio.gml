@@ -447,6 +447,7 @@ function Pinocchio(_ruleset) constructor
         var _i = 0;
         repeat(argument_count)
         {
+            _string += string(argument[_i]);
             ++_i;
         }
         
