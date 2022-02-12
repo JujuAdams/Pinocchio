@@ -1,9 +1,9 @@
 /// If no duration is specified for a transition, this value is used instead
 #macro PINOCCHIO_DEFAULT_DURATION  500
 
-/// Setting this macro to <true> will instruct the .Update() method to use to measure durations in
-/// milliseconds rather than frames. You will need to adjust all your durations (including
-/// PINOCCHIO_DEFAULT_DURATION above) accordingly
+/// Setting this macro to <false> will set the units for durations throughout to frames rather than
+/// milliseconds. You will need to adjust all your durations (including PINOCCHIO_DEFAULT_DURATION
+/// above) accordingly
 #macro PINOCCHIO_USE_MILLISECONDS  true
 
 /// This macro defines the substring that's used to join two state names together to make the name

@@ -1,0 +1,1 @@
+draw_text(room_width/2 + puppet.xOffset, room_height/2, "Text!");

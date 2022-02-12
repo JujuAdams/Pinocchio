@@ -1,15 +1,17 @@
 {
   "resources": [
-    {"id":{"name":"curveCubicOut","path":"animcurves/curveCubicOut/curveCubicOut.yy",},"order":7,},
-    {"id":{"name":"curveQuartInOut","path":"animcurves/curveQuartInOut/curveQuartInOut.yy",},"order":9,},
+    {"id":{"name":"oTestMethods","path":"objects/oTestMethods/oTestMethods.yy",},"order":1,},
+    {"id":{"name":"curveCubicOut","path":"animcurves/curveCubicOut/curveCubicOut.yy",},"order":6,},
+    {"id":{"name":"oTestBasic","path":"objects/oTestBasic/oTestBasic.yy",},"order":0,},
+    {"id":{"name":"curveQuartInOut","path":"animcurves/curveQuartInOut/curveQuartInOut.yy",},"order":8,},
     {"id":{"name":"__PinocchioConfig","path":"scripts/__PinocchioConfig/__PinocchioConfig.yy",},"order":0,},
     {"id":{"name":"Pinocchio Documentation","path":"notes/Pinocchio Documentation/Pinocchio Documentation.yy",},"order":2,},
-    {"id":{"name":"curveCubicIn","path":"animcurves/curveCubicIn/curveCubicIn.yy",},"order":6,},
-    {"id":{"name":"curveBackOut","path":"animcurves/curveBackOut/curveBackOut.yy",},"order":8,},
-    {"id":{"name":"oTest","path":"objects/oTest/oTest.yy",},"order":1,},
+    {"id":{"name":"curveCubicIn","path":"animcurves/curveCubicIn/curveCubicIn.yy",},"order":5,},
+    {"id":{"name":"curveBackOut","path":"animcurves/curveBackOut/curveBackOut.yy",},"order":7,},
+    {"id":{"name":"oExample","path":"objects/oExample/oExample.yy",},"order":2,},
     {"id":{"name":"Pinocchio","path":"scripts/Pinocchio/Pinocchio.yy",},"order":1,},
-    {"id":{"name":"curveLinear","path":"animcurves/curveLinear/curveLinear.yy",},"order":5,},
-    {"id":{"name":"rMain","path":"rooms/rMain/rMain.yy",},"order":0,},
+    {"id":{"name":"curveLinear","path":"animcurves/curveLinear/curveLinear.yy",},"order":4,},
+    {"id":{"name":"rMain","path":"rooms/rMain/rMain.yy",},"order":1,},
   ],
   "Options": [
     {"name":"Amazon Fire","path":"options/amazonfire/options_amazonfire.yy",},
@@ -40,7 +42,8 @@
     {"roomId":{"name":"rMain","path":"rooms/rMain/rMain.yy",},},
   ],
   "Folders": [
-    {"folderPath":"folders/Pinocchio.yy","order":2,"resourceVersion":"1.0","name":"Pinocchio","tags":[],"resourceType":"GMFolder",},
+    {"folderPath":"folders/Pinocchio.yy","order":0,"resourceVersion":"1.0","name":"Pinocchio","tags":[],"resourceType":"GMFolder",},
+    {"folderPath":"folders/Test Cases.yy","order":3,"resourceVersion":"1.0","name":"Test Cases","tags":[],"resourceType":"GMFolder",},
   ],
   "AudioGroups": [
     {"targets":-1,"resourceVersion":"1.3","name":"audiogroup_default","resourceType":"GMAudioGroup",},
