@@ -27,8 +27,8 @@ a transition from one state to the next:
 
     if (keyboard_check_pressed(vk_f1)) newPuppet.Goto("popOut");
 
-There are a handful of other methods available for use - please scroll down if you'd like to
-take a look.
+There are a handful of other methods available for use (there's a list of methods at the
+bottom of this document).
 
 
 
@@ -183,7 +183,7 @@ considerations for their use.
     
 .Skip([immediate = true])
     Skips the current transition, causing it to complete. If the "immediate" argument is set to
-    <false> then puppet's variables will only be updated the next __time .Update() is called
+    <false> then puppet's variables will only be updated the next time .Update() is called
 
 .Cancel()
     Stops the current transition, returning the puppet to its previous state. Please note that

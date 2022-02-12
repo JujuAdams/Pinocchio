@@ -10,11 +10,12 @@
 
 function Pinocchio(_ruleset) constructor
 {
+    if (!is_struct(_ruleset)) __Error("Ruleset provided is not a struct (was \"", typeof(_ruleset), "\")");
     __ruleset = _ruleset;
     
     __previousRealtime = current_time;
-    __time               = 0;
-    __duration           = 0;
+    __transitionTime   = 0;
+    __duration         = 0;
     
     __finalizingLock = false;
     __finalizeReset  = false;
@@ -30,22 +31,33 @@ function Pinocchio(_ruleset) constructor
     __nextCallback  = undefined;
     __nextCurves    = undefined;
     
-    __queuedStateName = undefined;
-    __queuedDelay     = 0;
-    __queuedCallback  = undefined;
+    __queuedStateName   = undefined;
+    __queuedDelayOffset = 0;
+    __queuedCallback    = undefined;
     
     
     
     #region Initialization
+    
+    if (PINOCCHIO_SAFE_MODE)
+    {
+        var _variableUseCountMap = ds_map_create();
+    }
     
     var _stateNames = variable_struct_get_names(__ruleset);
     var _i = 0;
     repeat(array_length(_stateNames))
     {
         var _stateName = _stateNames[_i];
-        if (_stateName == PINOCCHIO_TRANSITION_WILDCARD_STATE) show_error("Pinocchio:\nStates cannot use \"" + PINOCCHIO_TRANSITION_WILDCARD_STATE + "\" (PINOCCHIO_TRANSITION_WILDCARD_STATE) as a state name\n ", true);
+        if (_stateName == PINOCCHIO_TRANSITION_WILDCARD_STATE) __Error("States cannot use \"", PINOCCHIO_TRANSITION_WILDCARD_STATE, "\" (PINOCCHIO_TRANSITION_WILDCARD_STATE) as a state name");
         
         var _state = __ruleset[$ _stateName];
+        if (!is_struct(_state)) __Error("State/transition definition for \"", _stateName, "\" is not a struct (was \"", typeof(_state), "\")");
+        
+        if (PINOCCHIO_SAFE_MODE && (_state == PINOCCHIO_TRANSITION_WILDCARD_STATE))
+        {
+            __Error("State names cannot be the same as the transition wildcard (\"", PINOCCHIO_TRANSITION_WILDCARD_STATE, "\")");
+        }
         
         var _variableNames = variable_struct_get_names(_state);
         var _j = 0;
@@ -56,15 +68,44 @@ function Pinocchio(_ruleset) constructor
             if (_variableName == "duration")
             {
                 //Ignore variables called "duration"
-                if (PINOCCHIO_SAFE_MODE && (string_pos(PINOCCHIO_TRANSITION_SUBSTRING, _stateName) <= 0)) show_error("Pinocchio:\nStates cannot use \"duration\" as a variable name\n ", true);
+                if (PINOCCHIO_SAFE_MODE && (string_pos(PINOCCHIO_TRANSITION_SUBSTRING, _stateName) <= 0)) __Error("States cannot use \"duration\" as a variable name");
+            }
+            else if (_variableName == "delay")
+            {
+                //Ignore variables called "delay"
+                if (PINOCCHIO_SAFE_MODE && (string_pos(PINOCCHIO_TRANSITION_SUBSTRING, _stateName) <= 0)) __Error("States cannot use \"delay\" as a variable name");
             }
             else if (PINOCCHIO_SAFE_MODE && (string_copy(_variableName, 1, 2) == "__"))
             {
-                show_error("Pinocchio:\nVariables cannot start with \"__\"\n ", true);
+                //Ignore variables that start with __ as they might conflict with private Pinocchio variables/methods
+                __Error("Variables cannot start with \"__\"");
             }
             else
             {
-                self[$ _variableName] = undefined;
+                if (PINOCCHIO_SAFE_MODE)
+                {
+                    //Final verbose check for method name collisions
+                    switch(_variableName)
+                    {
+                        case "Update":       case "Goto":
+                        case "Set":          case "Finalize":
+                        case "Skip":         case "Cancel":
+                        case "CancelQueued": case "GetProgress":
+                        case "GetCurrent":   case "GetNext":
+                        case "GetQueued":    case "GetFinalized":
+                            __Error("Variable names (\"" + string(_variableName) + "\") cannot be the same as puppet methods");
+                        break;
+                    }
+                }
+                
+                //We do *not* want to default to <undefined> here because we need to interpolate values
+                self[$ _variableName] = 0;
+                
+                if (PINOCCHIO_SAFE_MODE)
+                {
+                    var _count = _variableUseCountMap[? _variableName];
+                    _variableUseCountMap[? _variableName] = (_count == undefined)? 1 : (_count + 1);
+                }
             }
             
             ++_j;
@@ -75,14 +116,25 @@ function Pinocchio(_ruleset) constructor
     
     if (PINOCCHIO_SAFE_MODE)
     {
+        var _keyArray   = ds_map_keys_to_array(  _variableUseCountMap);
+        var _valueArray = ds_map_values_to_array(_variableUseCountMap);
+        var _i = 0;
+        repeat(array_length(_valueArray))
+        {
+            if (_valueArray[_i] <= 1) show_debug_message("Pinocchio: Warning! Variable \"" + string(_keyArray[_i]) + "\" was only used once. This could be due to a spelling error");
+            ++_i;
+        }
+        
+        ds_map_destroy(_variableUseCountMap);
+        
         if (!variable_struct_exists(__ruleset, PINOCCHIO_INITIAL_STATE_NAME))
         {
-            show_error("Pinocchio:\nPinocchio:\nInitial state \"" + string(PINOCCHIO_INITIAL_STATE_NAME) + "\" was not found\n ", true);
+            __Error("Initial state \"" + string(PINOCCHIO_INITIAL_STATE_NAME) + "\" was not found");
         }
     
         if (!variable_struct_exists(__ruleset, PINOCCHIO_FINAL_STATE_NAME))
         {
-            show_debug_message("Pinocchio: Warning! Final state \"" + string(PINOCCHIO_FINAL_STATE_NAME) + "\" was not found\n ");
+            show_debug_message("Pinocchio: Warning! Final state \"" + string(PINOCCHIO_FINAL_STATE_NAME) + "\" was not found");
         }
     }
     
@@ -100,6 +152,8 @@ function Pinocchio(_ruleset) constructor
         
         __finalized = false;
         
+        if (!variable_struct_exists(__ruleset, _stateName)) __Error("State \"", _stateName, "\" doesn't exist in ruleset");
+        
         __currentStateName = _stateName;
         __currentState     = __ruleset[$ __currentStateName];
     
@@ -110,11 +164,9 @@ function Pinocchio(_ruleset) constructor
         __nextCallback  = undefined;
         __nextCurves    = undefined;
         
-        __queuedStateName = undefined;
-        __queuedDelay     = 0;
-        __queuedCallback  = undefined;
-        
-        if (!is_struct(__currentState)) show_error("Pinocchio:\nState \"" + string(__currentStateName) + "\" doesn't exist\n ", true);
+        __queuedStateName   = undefined;
+        __queuedDelayOffset = 0;
+        __queuedCallback    = undefined;
         
         var _variableNames = variable_struct_get_names(__currentState);
         var _i = 0;
@@ -128,20 +180,20 @@ function Pinocchio(_ruleset) constructor
         return self;
     }
     
-    static Goto = function(_stateName, _delay = 0, _callback = undefined)
+    static Goto = function(_stateName, _delayOffset = 0, _callback = undefined)
     {
         if (__finalizingLock) return self;
         
         __finalized = false;
         
+        if (!variable_struct_exists(__ruleset, _stateName)) __Error("State \"", _stateName, "\" doesn't exist in ruleset");
+        
         if ((__nextState == undefined) && (__currentStateName != _stateName))
         {
             __nextStateName = _stateName;
             __nextState     = __ruleset[$ __nextStateName];
-            __nextDelay     = _delay;
+            __nextDelay     = _delayOffset;
             __nextCallback  = _callback;
-            
-            if (!is_struct(__nextState)) show_error("Pinocchio:\nState \"" + string(__nextStateName) + "\" doesn't exist\n ", true);
             
             //Create a record of the current variable values
             var _variableNames = variable_struct_get_names(__nextState);
@@ -159,15 +211,18 @@ function Pinocchio(_ruleset) constructor
             if (__nextCurves == undefined) __nextCurves = __ruleset[$ __currentStateName + PINOCCHIO_TRANSITION_SUBSTRING + PINOCCHIO_TRANSITION_WILDCARD_STATE];
             if (__nextCurves == undefined) __nextCurves = __ruleset[$ PINOCCHIO_TRANSITION_WILDCARD_STATE + PINOCCHIO_TRANSITION_SUBSTRING + PINOCCHIO_TRANSITION_WILDCARD_STATE];
             
-            __time     = 0;
+            __transitionTime = 0;
             __duration = (__nextCurves == undefined)? undefined : __nextCurves[$ "duration"];
             if (__duration == undefined) __duration = PINOCCHIO_DEFAULT_DURATION;
+            
+            var _delay = (__nextCurves == undefined)? 0 : __nextCurves[$ "delay"];
+            if (_delay != undefined) __nextDelay += _delay;
         }
         else if ((__nextStateName != _stateName) && (__nextState != undefined))
         {
-            __queuedStateName = _stateName;
-            __queuedDelay     = _delay;
-            __queuedCallback  = _callback;
+            __queuedStateName   = _stateName;
+            __queuedDelayOffset = _delayOffset;
+            __queuedCallback    = _callback;
         }
         
         return self;
@@ -189,7 +244,7 @@ function Pinocchio(_ruleset) constructor
         
         if (__nextState != undefined)
         {
-            __time += _increment;
+            __transitionTime += _increment;
             var _t = GetProgress();
             
             if (_t < 1)
@@ -223,7 +278,7 @@ function Pinocchio(_ruleset) constructor
                             }
                             else
                             {
-                                show_error("Pinocchio:\nCurve type \"" + string(_curve) + "\" not recognised\n ", true);
+                                __Error("Curve type \"" + string(_curve) + "\" not recognised");
                             }
                         break;
                     }
@@ -279,7 +334,7 @@ function Pinocchio(_ruleset) constructor
                         __finalizingLock = false;
                     }
                     
-                    Goto(__queuedStateName, __queuedDelay, __queuedCallback);
+                    Goto(__queuedStateName, __queuedDelayOffset, __queuedCallback);
                     
                     if (_wasLocked) __finalizingLock = true;
                     
@@ -288,7 +343,7 @@ function Pinocchio(_ruleset) constructor
                 else if (__finalizeReset && (__currentStateName == PINOCCHIO_FINAL_STATE_NAME) && variable_struct_exists(__ruleset, PINOCCHIO_INITIAL_STATE_NAME))
                 {
                     __finalizeReset = false;
-                    Set(PINOCCHIO_INITIAL_STATE_NAME)
+                    Set(PINOCCHIO_INITIAL_STATE_NAME);
                 }
             }
         }
@@ -324,9 +379,9 @@ function Pinocchio(_ruleset) constructor
     {
         if (__finalizingLock) return self;
         
-        __queuedStateName = undefined;
-        __queuedDelay     = undefined;
-        __queuedCallback  = undefined;
+        __queuedStateName   = undefined;
+        __queuedDelayOffset = undefined;
+        __queuedCallback    = undefined;
         
         return self;
     }
@@ -342,7 +397,7 @@ function Pinocchio(_ruleset) constructor
     
     static Skip = function(_immediate = true)
     {
-        __time = infinity;
+        __transitionTime = infinity;
         if (_immediate) Update();
         
         return self;
@@ -357,7 +412,7 @@ function Pinocchio(_ruleset) constructor
     static GetProgress = function()
     {
         if (__nextState == undefined) return 1.0;
-        return clamp((__time - __nextDelay) / __duration, 0, 1);
+        return clamp((__transitionTime - __nextDelay) / __duration, 0, 1);
     }
     
     static GetCurrent = function()
@@ -384,7 +439,19 @@ function Pinocchio(_ruleset) constructor
     
     
     
-    #region Bezier Curves
+    #region Private
+    
+    static __Error = function()
+    {
+        var _string = "Pinocchio:\n";
+        var _i = 0;
+        repeat(argument_count)
+        {
+            ++_i;
+        }
+        
+        show_error(_string + "\n ", true);
+    }
     
     static __GetBezier = function(_definitionArray, _position)
     {
@@ -393,7 +460,7 @@ function Pinocchio(_ruleset) constructor
         
         if (array_length(_definitionArray) != 4)
         {
-            show_error("Pinocchio:\nBezier curve definitions should have 2 control points (array should have 4 elements)\n ", true);
+            __Error("Bezier curve definitions should have 2 control points (array should have 4 elements)");
             return 0;
         }
         
