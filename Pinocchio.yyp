@@ -1,6 +1,6 @@
 {
   "resources": [
-    {"id":{"name":"oTestMethods","path":"objects/oTestMethods/oTestMethods.yy",},"order":1,},
+    {"id":{"name":"oTestTransitionMethods","path":"objects/oTestTransitionMethods/oTestTransitionMethods.yy",},"order":1,},
     {"id":{"name":"curveCubicOut","path":"animcurves/curveCubicOut/curveCubicOut.yy",},"order":6,},
     {"id":{"name":"oTestBasic","path":"objects/oTestBasic/oTestBasic.yy",},"order":0,},
     {"id":{"name":"curveQuartInOut","path":"animcurves/curveQuartInOut/curveQuartInOut.yy",},"order":8,},

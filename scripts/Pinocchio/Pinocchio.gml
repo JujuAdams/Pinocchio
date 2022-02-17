@@ -14,17 +14,20 @@ function Pinocchio(_ruleset) constructor
     __ruleset = _ruleset;
     
     __previousRealtime = current_time;
-    __transitionTime   = 0;
-    __duration         = 0;
+    
+    __transitionTime        = 0;
+    __transitionStartValues = undefined;
+    __transitionDuration    = 0;
     
     __finalizingLock = false;
     __finalizeReset  = false;
     __finalized      = false;
     
+    __currentStateTime = undefined;
     __currentStateName = undefined;
     __currentState     = undefined;
-    __currentValues    = {};
     
+    __nextStateTime = undefined;
     __nextStateName = undefined;
     __nextState     = undefined;
     __nextDelay     = 0;
@@ -34,6 +37,8 @@ function Pinocchio(_ruleset) constructor
     __queuedStateName   = undefined;
     __queuedDelayOffset = 0;
     __queuedCallback    = undefined;
+    
+    __stateVariableNameDictionary = {};
     
     
     
@@ -59,21 +64,18 @@ function Pinocchio(_ruleset) constructor
             __Error("State names cannot be the same as the transition wildcard (\"", PINOCCHIO_TRANSITION_WILDCARD_STATE, "\")");
         }
         
-        var _variableNames = variable_struct_get_names(_state);
+        var _variableNamesArray = variable_struct_get_names(_state);
+        __stateVariableNameDictionary[$ _stateName] = _variableNamesArray;
+        
         var _j = 0;
-        repeat(array_length(_variableNames))
+        repeat(array_length(_variableNamesArray))
         {
-            var _variableName = _variableNames[_j];
+            var _variableName = _variableNamesArray[_j];
             
-            if (_variableName == "duration")
+            if ((_variableName == "duration") || (_variableName == "delay"))
             {
-                //Ignore variables called "duration"
-                if (PINOCCHIO_SAFE_MODE && (string_pos(PINOCCHIO_TRANSITION_SUBSTRING, _stateName) <= 0)) __Error("States cannot use \"duration\" as a variable name");
-            }
-            else if (_variableName == "delay")
-            {
-                //Ignore variables called "delay"
-                if (PINOCCHIO_SAFE_MODE && (string_pos(PINOCCHIO_TRANSITION_SUBSTRING, _stateName) <= 0)) __Error("States cannot use \"delay\" as a variable name");
+                //Ignore variables called "duration" or "delay"
+                if (PINOCCHIO_SAFE_MODE && (string_pos(PINOCCHIO_TRANSITION_SUBSTRING, _stateName) <= 0)) __Error("States cannot use \"", _variableName, "\" as a variable name");
             }
             else if (PINOCCHIO_SAFE_MODE && (string_copy(_variableName, 1, 2) == "__"))
             {
@@ -154,10 +156,19 @@ function Pinocchio(_ruleset) constructor
         
         if (!variable_struct_exists(__ruleset, _stateName)) __Error("State \"", _stateName, "\" doesn't exist in ruleset");
         
+        //If we're changing state, set our state time
+        if (__currentStateName != _stateName)
+        {
+            //If the state we're trying to transition into is the target for .Set() then inherit the state time for continuity
+            __currentStateTime = (__nextStateName == _stateName)? __nextStateTime : 0;
+        }
+        
         __currentStateName = _stateName;
         __currentState     = __ruleset[$ __currentStateName];
     
-        __currentValues = {};
+        __transitionStartValues = undefined;
+        
+        __nextStateTime = undefined;
         __nextStateName = undefined;
         __nextState     = undefined;
         __nextDelay     = 0;
@@ -168,7 +179,7 @@ function Pinocchio(_ruleset) constructor
         __queuedDelayOffset = 0;
         __queuedCallback    = undefined;
         
-        var _variableNames = variable_struct_get_names(__currentState);
+        var _variableNames = __stateVariableNameDictionary[$ __currentStateName];
         var _i = 0;
         repeat(array_length(_variableNames))
         {
@@ -190,20 +201,20 @@ function Pinocchio(_ruleset) constructor
         
         if ((__nextState == undefined) && (__currentStateName != _stateName))
         {
+            __nextStateTime = 0;
             __nextStateName = _stateName;
             __nextState     = __ruleset[$ __nextStateName];
             __nextDelay     = _delayOffset;
             __nextCallback  = _callback;
             
             //Create a record of the current variable values
-            var _variableNames = variable_struct_get_names(__nextState);
-            var _i = 0;
-            repeat(array_length(_variableNames))
-            {
-                var _variableName = _variableNames[_i];
-                __currentValues[$ _variableName] = self[$ _variableName];
-                ++_i;
-            }
+            __transitionStartValues = {};
+            __CopyPartialState(self, __transitionStartValues, __stateVariableNameDictionary[$ __nextStateName]);
+            
+            //Create a set of target values to interpolate towards
+            __transitionEndValues = {};
+            __CopyPartialState(self, __transitionEndValues, __stateVariableNameDictionary[$ __nextStateName]);
+            __EvaluateAllStateVariables(__transitionEndValues, __nextStateName, __nextState, 0);
             
             //Find the curves that control the transition from the current state to the next one
             __nextCurves = __ruleset[$ __currentStateName + PINOCCHIO_TRANSITION_SUBSTRING + __nextStateName];
@@ -212,8 +223,8 @@ function Pinocchio(_ruleset) constructor
             if (__nextCurves == undefined) __nextCurves = __ruleset[$ PINOCCHIO_TRANSITION_WILDCARD_STATE + PINOCCHIO_TRANSITION_SUBSTRING + PINOCCHIO_TRANSITION_WILDCARD_STATE];
             
             __transitionTime = 0;
-            __duration = (__nextCurves == undefined)? undefined : __nextCurves[$ "duration"];
-            if (__duration == undefined) __duration = PINOCCHIO_DEFAULT_DURATION;
+            __transitionDuration = (__nextCurves == undefined)? undefined : __nextCurves[$ "duration"];
+            if (__transitionDuration == undefined) __transitionDuration = PINOCCHIO_DEFAULT_DURATION;
             
             var _delay = (__nextCurves == undefined)? 0 : __nextCurves[$ "delay"];
             if (_delay != undefined) __nextDelay += _delay;
@@ -230,8 +241,6 @@ function Pinocchio(_ruleset) constructor
     
     static Update = function(_stepSize = 1)
     {
-        var _result = false;
-        
         if (PINOCCHIO_USE_MILLISECONDS)
         {
             var _increment = _stepSize*(current_time - __previousRealtime);
@@ -242,15 +251,25 @@ function Pinocchio(_ruleset) constructor
             var _increment = _stepSize;
         }
         
-        if (__nextState != undefined)
+        __currentStateTime += _increment;
+        
+        if (__nextState == undefined)
+        {
+            __EvaluateMethodStateVariables(self, __currentStateName, __currentState, __currentStateTime);
+        }
+        else
         {
             __transitionTime += _increment;
-            var _t = GetProgress();
+            __nextStateTime += _increment;
             
+            var _t = GetProgress();
             if (_t < 1)
             {
+                __EvaluateMethodStateVariables(__transitionStartValues, __currentStateName, __currentState, __currentStateTime);
+                __EvaluateMethodStateVariables(__transitionEndValues, __nextStateName, __nextState, __nextStateTime);
+                
                 //Do some interpolation :D
-                var _variableNames = variable_struct_get_names(__nextState);
+                var _variableNames = __stateVariableNameDictionary[$ __nextStateName];
                 var _i = 0;
                 repeat(array_length(_variableNames))
                 {
@@ -283,25 +302,19 @@ function Pinocchio(_ruleset) constructor
                         break;
                     }
                     
-                    self[$ _variableName] = lerp(__currentValues[$ _variableName], __nextState[$ _variableName], _q);
+                    self[$ _variableName] = lerp(__transitionStartValues[$ _variableName], __transitionEndValues[$ _variableName], _q);
                     
                     ++_i;
                 }
             }
             else //We've finished the animation!
             {
-                var _variableNames = variable_struct_get_names(__nextState);
-                var _i = 0;
-                repeat(array_length(_variableNames))
-                {
-                    var _variableName = _variableNames[_i];
-                    self[$ _variableName] = __nextState[$ _variableName];
-                    ++_i;
-                }
-                
-                _result = true;
-                
+                __currentStateTime = __nextStateTime;
                 __currentStateName = __nextStateName;
+                __currentState     = __nextState;
+                
+                __EvaluateAllStateVariables(self, __currentStateName, __currentState, __currentStateTime);
+                
                 if (__currentStateName == PINOCCHIO_FINAL_STATE_NAME)
                 {
                     __finalized = true;
@@ -317,7 +330,9 @@ function Pinocchio(_ruleset) constructor
                     script_execute(__nextCallback);
                 }
                 
-                __currentValues = {};
+                __transitionStartValues = undefined;
+                
+                __nextStateTime = undefined;
                 __nextStateName = undefined;
                 __nextState     = undefined;
                 __nextDelay     = 0;
@@ -346,25 +361,19 @@ function Pinocchio(_ruleset) constructor
                 }
             }
         }
-        
-        return _result;
     }
     
     static Cancel = function()
     {
         if (__finalizingLock) return self;
+        if (__nextState == undefined) return self;
         
         //Reset variables
-        var _variableNames = variable_struct_get_names(__currentValues);
-        var _i = 0;
-        repeat(array_length(_variableNames))
-        {
-            var _variableName = _variableNames[_i];
-            self[$ _variableName] = __currentValues[$ _variableName];
-            ++_i;
-        }
+        __EvaluateAllStateVariables(__transitionStartValues, __currentStateName, __currentState, __currentStateTime);
+        __CopyPartialState(__transitionStartValues, self, variable_struct_get_names(__transitionStartValues));
+        __transitionStartValues = undefined;
         
-        __currentValues = {};
+        __nextStateTime = undefined;
         __nextStateName = undefined;
         __nextState     = undefined;
         __nextDelay     = 0;
@@ -411,7 +420,7 @@ function Pinocchio(_ruleset) constructor
     static GetProgress = function()
     {
         if (__nextState == undefined) return 1.0;
-        return clamp((__transitionTime - __nextDelay) / __duration, 0, 1);
+        return clamp((__transitionTime - __nextDelay) / __transitionDuration, 0, 1);
     }
     
     static GetCurrent = function()
@@ -439,6 +448,60 @@ function Pinocchio(_ruleset) constructor
     
     
     #region Private
+    
+    static __CopyPartialState = function(_source, _destination, _variableNames)
+    {
+        var _i = 0;
+        repeat(array_length(_variableNames))
+        {
+            var _variableName = _variableNames[_i];
+            _destination[$ _variableName] = _source[$ _variableName];
+            ++_i;
+        }
+    }
+    
+    //Only set all variables in a state
+    static __EvaluateAllStateVariables = function(_destination, _stateName, _state, _stateTime)
+    {
+        var _variableNames = __stateVariableNameDictionary[$ _stateName];
+        var _i = 0;
+        repeat(array_length(_variableNames))
+        {
+            var _variableName = _variableNames[_i];
+            
+            var _value = _state[$ _variableName];
+            if (is_method(_value))
+            {
+                var _value = _value(_stateTime);
+                if (PINOCCHIO_SAFE_MODE && !is_numeric(_value)) __Error("Method returned non-numeric value");
+            }
+            
+            _destination[$ _variableName] = _value;
+            
+            ++_i;
+        }
+    }
+    
+    //Only set variables in a state if they're associated with methods, and ignore non-dynamic values
+    static __EvaluateMethodStateVariables = function(_destination, _stateName, _state, _stateTime)
+    {
+        var _variableNames = __stateVariableNameDictionary[$ _stateName];
+        var _i = 0;
+        repeat(array_length(_variableNames))
+        {
+            var _variableName = _variableNames[_i];
+            
+            var _value = _state[$ _variableName];
+            if (is_method(_value))
+            {
+                _value = _value(_stateTime);
+                if (PINOCCHIO_SAFE_MODE && !is_numeric(_value)) __Error("Method returned non-numeric value");
+                _destination[$ _variableName] = _value;
+            }
+            
+            ++_i;
+        }
+    }
     
     static __Error = function()
     {
@@ -591,7 +654,7 @@ function Pinocchio(_ruleset) constructor
 
 
 
-#macro __PINOCCHIO_VERSION  "0.1.1"
+#macro __PINOCCHIO_VERSION  "0.1.0"
 #macro __PINOCCHIO_DATE     "2022-02-12"
 
 show_debug_message("Pinocchio: Welcome to Pinocchio by @jujuadams! This is version " + __PINOCCHIO_VERSION + ", " + __PINOCCHIO_DATE);

@@ -29,7 +29,7 @@
     "path": "folders/Test Cases.yy",
   },
   "resourceVersion": "1.0",
-  "name": "oTestMethods",
+  "name": "oTestTransitionMethods",
   "tags": [],
   "resourceType": "GMObject",
 }

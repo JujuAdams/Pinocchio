@@ -25,7 +25,7 @@ ruleset = {
     
     centre: {
         xOffset: 0,
-        yOffset: 0,
+        yOffset: function(_t) { return 20*dsin(_t/15) },
         alpha: 1,
     },
     
