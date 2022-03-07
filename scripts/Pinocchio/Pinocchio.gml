@@ -16,8 +16,9 @@ function Pinocchio(_ruleset) constructor
     __previousRealtime = current_time;
     
     __transitionTime        = 0;
-    __transitionStartValues = undefined;
     __transitionDuration    = 0;
+    __transitionStartValues = undefined;
+    __transitionEndValues   = undefined;
     
     __finalizingLock = false;
     __finalizeReset  = false;
@@ -27,7 +28,6 @@ function Pinocchio(_ruleset) constructor
     __currentStateName = undefined;
     __currentState     = undefined;
     
-    __nextStateTime = undefined;
     __nextStateName = undefined;
     __nextState     = undefined;
     __nextDelay     = 0;
@@ -156,19 +156,12 @@ function Pinocchio(_ruleset) constructor
         
         if (!variable_struct_exists(__ruleset, _stateName)) __Error("State \"", _stateName, "\" doesn't exist in ruleset");
         
-        //If we're changing state, set our state time
-        if (__currentStateName != _stateName)
-        {
-            //If the state we're trying to transition into is the target for .Set() then inherit the state time for continuity
-            __currentStateTime = (__nextStateName == _stateName)? __nextStateTime : 0;
-        }
-        
         __currentStateName = _stateName;
         __currentState     = __ruleset[$ __currentStateName];
     
         __transitionStartValues = undefined;
+        __transitionEndValues   = undefined;
         
-        __nextStateTime = undefined;
         __nextStateName = undefined;
         __nextState     = undefined;
         __nextDelay     = 0;
@@ -201,7 +194,6 @@ function Pinocchio(_ruleset) constructor
         
         if ((__nextState == undefined) && (__currentStateName != _stateName))
         {
-            __nextStateTime = 0;
             __nextStateName = _stateName;
             __nextState     = __ruleset[$ __nextStateName];
             __nextDelay     = _delayOffset;
@@ -251,23 +243,18 @@ function Pinocchio(_ruleset) constructor
             var _increment = _stepSize;
         }
         
-        __currentStateTime += _increment;
-        
         if (__nextState == undefined)
         {
+            __currentStateTime += _increment;
             __EvaluateMethodStateVariables(self, __currentStateName, __currentState, __currentStateTime);
         }
         else
         {
             __transitionTime += _increment;
-            __nextStateTime += _increment;
             
             var _t = GetProgress();
             if (_t < 1)
             {
-                __EvaluateMethodStateVariables(__transitionStartValues, __currentStateName, __currentState, __currentStateTime);
-                __EvaluateMethodStateVariables(__transitionEndValues, __nextStateName, __nextState, __nextStateTime);
-                
                 //Do some interpolation :D
                 var _variableNames = __stateVariableNameDictionary[$ __nextStateName];
                 var _i = 0;
@@ -309,7 +296,7 @@ function Pinocchio(_ruleset) constructor
             }
             else //We've finished the animation!
             {
-                __currentStateTime = __nextStateTime;
+                __currentStateTime = 0;
                 __currentStateName = __nextStateName;
                 __currentState     = __nextState;
                 
@@ -331,8 +318,8 @@ function Pinocchio(_ruleset) constructor
                 }
                 
                 __transitionStartValues = undefined;
+                __transitionEndValues   = undefined;
                 
-                __nextStateTime = undefined;
                 __nextStateName = undefined;
                 __nextState     = undefined;
                 __nextDelay     = 0;
@@ -371,10 +358,10 @@ function Pinocchio(_ruleset) constructor
         //Reset variables
         __EvaluateAllStateVariables(__transitionStartValues, __currentStateName, __currentState, __currentStateTime);
         __CopyPartialState(__transitionStartValues, self, variable_struct_get_names(__transitionStartValues));
-        __transitionStartValues = undefined;
         
-        __nextStateTime = undefined;
-        __nextStateName = undefined;
+        __transitionStartValues = undefined;
+        __transitionEndValues   = undefined;
+        
         __nextState     = undefined;
         __nextDelay     = 0;
         __nextCallback  = undefined;
