@@ -11,10 +11,10 @@ to another state. Constructing a puppet is easy enough:
     ///Create event
     newPuppet = new Pinocchio(<rulesStruct>);
 
-Note the we need to pass a ruleset into the constructor function; we'll talk about ruleset
+Note the we need to pass a ruleset into the constructor function; we'll talk about rulesets
 a little later. At any rate, "newPuppet" holds a reference to a puppet struct which can be
 manipulated by calling methods on it. For example, the .Update() method will cause the
-puppet to handle the current animation and will update all of its variables:
+puppet to handle the current animation, updating all of the puppet's variables:
 
     ///Step event
     newPuppet.Update();
@@ -22,8 +22,7 @@ puppet to handle the current animation and will update all of its variables:
 N.B. It is very important to call .Update() every frame to ensure that the puppet is updating
      its variables constantly!
 
-Making sure that we call .Update every frame, we can then call the .Goto() method to start
-a transition from one state to the next:
+We can then call the .Goto() method to start a transition from one state to another:
 
     if (keyboard_check_pressed(vk_f1)) newPuppet.Goto("popOut");
 
@@ -68,9 +67,9 @@ different kinds of child struct:
     1. State Definitions
     2. Transition Definitions
 
-States define a set of variables and their respective values. Transitions define what interpolation
-behaviour to use for each variable when transitioning between two specific states. Looking again
-at our ruleset we can see the following structure:
+States define a set of variables and their respective values when in that state. Transitions define
+what interpolation behaviour to use for each variable when transitioning between two specific states.
+Looking again at our ruleset we can see the following structure:
 
     {
         initial: {...},              A state called "initial"
@@ -81,8 +80,8 @@ at our ruleset we can see the following structure:
     }
 
 A state definition contains variables. When the puppet reaches a given state then the puppet's
-variable will hold the exact values defined in the state. A state's name is determined by the
-member variable's name in the root ruleset. The following ruleset defines a state called "initial"
+variable will hold the exact values defined for that state. A state's name is determined by the
+member variable's name in the ruleset. The following ruleset defines a state called "initial"
 that contains two variables, "yOffset" and "alpha", set to -30 and 0 respectively.
 
     {
@@ -93,20 +92,32 @@ that contains two variables, "yOffset" and "alpha", set to -30 and 0 respectivel
         ...
     }
 
-There are a few restrictions on variables:
+State names can be whatever you want, though there are a few restrictions on variable names:
     1. A variable name cannot start with "__"
     2. A variable name cannot be the same as any puppet method names (e.g. Goto or Update)
     3. A variable name cannot be "duration" or "delay"
-    4. A variable must be a number (booleans and integers are implicity cast to floats)
+
+Additionally, the value for a state variable must be either a number or a method. If the
+variable's value is a number then the puppet will set that variable to that value when the
+puppet enters the relevant state. However, if the value for a variable is a method then that
+method is re-evaluated every time .Update() is called for the puppet. The method set for a
+state variable is passed a single argument that represents how long the puppet has been in
+the given state - this defaults to being measured in milliseconds, but you can change the
+units of time to "game frames" by setting PINOCCHIO_USE_MILLISECONDS to false.
+
+
 
 A puppet expects there to be a state definition that describes the initial state for every
 variable that the puppet will use. You can specify your own initial state name by changing the
 PINOCCHIO_INITIAL_STATE_NAME macro; it defaults to "initial". When constructing a new puppet, it
 will start in this initial state.
 
-It is also recommend to use a state definition for the final ("destroy") state for a puppet.
-The name itself is defined by PINOCCHIO_FINAL_STATE_NAME. A puppet will not enforce the existence
-of a final state, but the .Finalize() method will not be available if no final state exists.
+It is also recommended to use a state definition for the final ("destroy") state for a puppet.
+The name itself is defined by PINOCCHIO_FINAL_STATE_NAME. A puppet will not strictly *requres*
+the existence of a final state, but the .Finalize() method will not be available if no final
+state can be defined in the ruleset.
+
+
 
 We also have transition definitions. Transitions describe how a puppet should interpolate
 from one state to another state. A transition's name is made of three parts:
@@ -121,11 +132,12 @@ The duration of a transition is given by the "duration" variable in the transiti
 Transitions can have a short predelay associated with them too, this can be set with the
 "delay" variable in a transition definition. Please note that .Goto() also contains a delay
 offset parameter. Durations and delays default to being measured in milliseconds, but you
-can change this by adjusting PINOCCHIO_USE_MILLISECONDS.
+can change delay and duration units to frames by setting PINOCCHIO_USE_MILLISECONDS to false.
 
 Transitions allow you to define specific interpolation behaviours for each individual variable.
 Interpolation behaviours are unique to each transition and one variable can be interpolated in
-many different ways depending on what transition is occurring.
+many different ways depending on what transition is occurring. Interpolation behaviours can be
+one of three different types:
     1. An animation curve asset that you've created in the GameMaker IDE
     2. A cubic Bezier curve, defined with a 4-element array [x1, y1, x2, y2]
     3. Either PINOCCHIO_CURVE_NONE or PINOCCHIO_CURVE_INSTANT
