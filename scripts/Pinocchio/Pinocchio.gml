@@ -19,6 +19,8 @@ function Pinocchio(_ruleset) constructor
     __transitionDuration    = 0;
     __transitionStartValues = undefined;
     __transitionEndValues   = undefined;
+    __transitionCallback    = undefined;
+    __transitionCurves      = undefined;
     
     __finalizingLock = false;
     __finalizeReset  = false;
@@ -31,8 +33,6 @@ function Pinocchio(_ruleset) constructor
     __nextStateName = undefined;
     __nextState     = undefined;
     __nextDelay     = 0;
-    __nextCallback  = undefined;
-    __nextCurves    = undefined;
     
     __queuedStateName   = undefined;
     __queuedDelayOffset = 0;
@@ -165,8 +165,8 @@ function Pinocchio(_ruleset) constructor
         __nextStateName = undefined;
         __nextState     = undefined;
         __nextDelay     = 0;
-        __nextCallback  = undefined;
-        __nextCurves    = undefined;
+        __transitionCallback  = undefined;
+        __transitionCurves    = undefined;
         
         __queuedStateName   = undefined;
         __queuedDelayOffset = 0;
@@ -197,7 +197,7 @@ function Pinocchio(_ruleset) constructor
             __nextStateName = _stateName;
             __nextState     = __ruleset[$ __nextStateName];
             __nextDelay     = _delayOffset;
-            __nextCallback  = _callback;
+            __transitionCallback  = _callback;
             
             //Create a record of the current variable values
             __transitionStartValues = {};
@@ -209,16 +209,16 @@ function Pinocchio(_ruleset) constructor
             __EvaluateAllStateVariables(__transitionEndValues, __nextStateName, __nextState, 0);
             
             //Find the curves that control the transition from the current state to the next one
-            __nextCurves = __ruleset[$ __currentStateName + PINOCCHIO_TRANSITION_SUBSTRING + __nextStateName];
-            if (__nextCurves == undefined) __nextCurves = __ruleset[$ PINOCCHIO_TRANSITION_WILDCARD_STATE + PINOCCHIO_TRANSITION_SUBSTRING + __nextStateName];
-            if (__nextCurves == undefined) __nextCurves = __ruleset[$ __currentStateName + PINOCCHIO_TRANSITION_SUBSTRING + PINOCCHIO_TRANSITION_WILDCARD_STATE];
-            if (__nextCurves == undefined) __nextCurves = __ruleset[$ PINOCCHIO_TRANSITION_WILDCARD_STATE + PINOCCHIO_TRANSITION_SUBSTRING + PINOCCHIO_TRANSITION_WILDCARD_STATE];
+            __transitionCurves = __ruleset[$ __currentStateName + PINOCCHIO_TRANSITION_SUBSTRING + __nextStateName];
+            if (__transitionCurves == undefined) __transitionCurves = __ruleset[$ PINOCCHIO_TRANSITION_WILDCARD_STATE + PINOCCHIO_TRANSITION_SUBSTRING + __nextStateName];
+            if (__transitionCurves == undefined) __transitionCurves = __ruleset[$ __currentStateName + PINOCCHIO_TRANSITION_SUBSTRING + PINOCCHIO_TRANSITION_WILDCARD_STATE];
+            if (__transitionCurves == undefined) __transitionCurves = __ruleset[$ PINOCCHIO_TRANSITION_WILDCARD_STATE + PINOCCHIO_TRANSITION_SUBSTRING + PINOCCHIO_TRANSITION_WILDCARD_STATE];
             
             __transitionTime = 0;
-            __transitionDuration = (__nextCurves == undefined)? undefined : __nextCurves[$ "duration"];
+            __transitionDuration = (__transitionCurves == undefined)? undefined : __transitionCurves[$ "duration"];
             if (__transitionDuration == undefined) __transitionDuration = PINOCCHIO_DEFAULT_DURATION;
             
-            var _delay = (__nextCurves == undefined)? 0 : __nextCurves[$ "delay"];
+            var _delay = (__transitionCurves == undefined)? 0 : __transitionCurves[$ "delay"];
             if (_delay != undefined) __nextDelay += _delay;
         }
         else if ((__nextStateName != _stateName) && (__nextState != undefined))
@@ -262,7 +262,7 @@ function Pinocchio(_ruleset) constructor
                 {
                     var _variableName = _variableNames[_i];
                     
-                    var _curve = !is_struct(__nextCurves)? undefined : __nextCurves[$ _variableName];
+                    var _curve = !is_struct(__transitionCurves)? undefined : __transitionCurves[$ _variableName];
                     switch(_curve)
                     {
                         case undefined:               var _q = _t;       break; //Default to linear
@@ -308,23 +308,23 @@ function Pinocchio(_ruleset) constructor
                     if (__finalizeReset) __finalizingLock = false;
                 }
                 
-                if (is_method(__nextCallback))
+                if (is_method(__transitionCallback))
                 {
-                    __nextCallback();
+                    __transitionCallback();
                 }
-                else if (is_numeric(__nextCallback) && script_exists(__nextCallback))
+                else if (is_numeric(__transitionCallback) && script_exists(__transitionCallback))
                 {
-                    script_execute(__nextCallback);
+                    script_execute(__transitionCallback);
                 }
                 
                 __transitionStartValues = undefined;
                 __transitionEndValues   = undefined;
+                __transitionCallback    = undefined;
+                __transitionCurves      = undefined;
                 
                 __nextStateName = undefined;
                 __nextState     = undefined;
                 __nextDelay     = 0;
-                __nextCallback  = undefined;
-                __nextCurves    = undefined;
                 
                 //If we have a queued animation
                 if (__queuedStateName != undefined)
@@ -364,8 +364,8 @@ function Pinocchio(_ruleset) constructor
         
         __nextState     = undefined;
         __nextDelay     = 0;
-        __nextCallback  = undefined;
-        __nextCurves    = undefined;
+        __transitionCallback  = undefined;
+        __transitionCurves    = undefined;
         
         return self;
     }
