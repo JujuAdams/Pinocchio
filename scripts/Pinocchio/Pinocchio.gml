@@ -10,7 +10,9 @@
 
 function Pinocchio(_ruleset) constructor
 {
-    if (!is_struct(_ruleset)) __Error("Ruleset provided is not a struct (was \"", typeof(_ruleset), "\")");
+    //Methods count as structs so we need to check for both
+    if (!is_struct(_ruleset) || is_method(_ruleset)) __Error("Ruleset provided is not a struct (was \"", typeof(_ruleset), "\")");
+    
     __ruleset = _ruleset;
     
     __previousRealtime = current_time;
@@ -57,7 +59,9 @@ function Pinocchio(_ruleset) constructor
         if (_stateName == PINOCCHIO_TRANSITION_WILDCARD_STATE) __Error("States cannot use \"", PINOCCHIO_TRANSITION_WILDCARD_STATE, "\" (PINOCCHIO_TRANSITION_WILDCARD_STATE) as a state name");
         
         var _state = __ruleset[$ _stateName];
-        if (!is_struct(_state)) __Error("State/transition definition for \"", _stateName, "\" is not a struct (was \"", typeof(_state), "\")");
+        
+        //Methods count as structs so we need to check for both
+        if (!is_struct(_state) || is_method(_state)) __Error("State/transition definition for \"", _stateName, "\" is not a struct (was \"", typeof(_state), "\")");
         
         if (PINOCCHIO_SAFE_MODE && (_state == PINOCCHIO_TRANSITION_WILDCARD_STATE))
         {
@@ -262,7 +266,7 @@ function Pinocchio(_ruleset) constructor
                 {
                     var _variableName = _variableNames[_i];
                     
-                    var _curve = !is_struct(__transitionCurves)? undefined : __transitionCurves[$ _variableName];
+                    var _curve = (!is_struct(__transitionCurves))? undefined : __transitionCurves[$ _variableName];
                     switch(_curve)
                     {
                         case undefined:               var _q = _t;       break; //Default to linear
